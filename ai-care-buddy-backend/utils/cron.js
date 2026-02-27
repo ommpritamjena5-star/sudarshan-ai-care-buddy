@@ -8,17 +8,9 @@ const startRoutineCron = () => {
     // Run every minute to check if any user routines are due Right Now.
     cron.schedule('* * * * *', async () => {
         try {
-            if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-                return; // SMTP Not Configured
+            if (!process.env.JWT_SECRET) {
+                return; // Proxy Secret Not Configured
             }
-
-            const transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASS
-                }
-            });
 
             // Format current time to match the 'HH:MM' string in the DB explicitly in IST (India Time)
             const now = new Date();
@@ -35,38 +27,39 @@ const startRoutineCron = () => {
             for (const routine of dueRoutines) {
                 if (!routine.user || !routine.user.email) continue;
 
-                const mailOptions = {
-                    from: `"AI Care Buddy" <${process.env.EMAIL_USER}>`,
-                    to: routine.user.email,
-                    subject: `⏰ Reminder: ${routine.title}`,
-                    html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-                            <div style="background: #eab308; padding: 20px; text-align: center; color: white;">
-                                <h2>Routine Reminder</h2>
-                            </div>
-                            <div style="padding: 20px; background: #f9f9f9; color: #333;">
-                                <p>Hello <b>${routine.user.name}</b>,</p>
-                                <p>This is a quick automated reminder from AI Care Buddy.</p>
-                                <p>It is time for your scheduled routine:</p>
-                                <h3 style="color: #eab308; text-align: center; font-size: 24px;">${routine.title}</h3>
-                                <p style="text-align: center;">Scheduled at: ${routine.time}</p>
-                                <br/>
-                                <p>Please open the app to mark this task as completed.</p>
-                                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                                <p style="font-size: 12px; color: #777; text-align: center;">Stay healthy, stay proactive.</p>
-                            </div>
+                const html = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #eab308; padding: 20px; text-align: center; color: white;">
+                            <h2>Routine Reminder</h2>
                         </div>
-                    `
-                };
+                        <div style="padding: 20px; background: #f9f9f9; color: #333;">
+                            <p>Hello <b>${routine.user.name}</b>,</p>
+                            <p>This is a quick automated reminder from AI Care Buddy.</p>
+                            <p>It is time for your scheduled routine:</p>
+                            <h3 style="color: #eab308; text-align: center; font-size: 24px;">${routine.title}</h3>
+                            <p style="text-align: center;">Scheduled at: ${routine.time}</p>
+                            <br/>
+                            <p>Please open the app to mark this task as completed.</p>
+                            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                            <p style="font-size: 12px; color: #777; text-align: center;">Stay healthy, stay proactive.</p>
+                        </div>
+                    </div>
+                `;
 
                 try {
-                    await transporter.sendMail(mailOptions);
-                    console.log(`[CRON] Email dispatched to ${routine.user.email} for routine: ${routine.title}`);
+                    const axios = require('axios');
+                    await axios.post('https://sudarshan-ai-care-buddy.vercel.app/api/sendEmail', {
+                        secret: process.env.JWT_SECRET,
+                        to: routine.user.email,
+                        subject: `⏰ Reminder: ${routine.title}`,
+                        html
+                    });
+                    console.log(`[CRON] Email dispatched to ${routine.user.email} via Vercel Proxy for routine: ${routine.title}`);
                     // Flag routine so we don't spam multiple emails within the same minute or if Cron double-fires
                     routine.emailReminderSent = true;
                     await routine.save();
                 } catch (emailErr) {
-                    console.error(`[CRON] Failed to send email to ${routine.user.email}`, emailErr);
+                    console.error(`[CRON] Vercel Email Proxy Failed to send to ${routine.user.email}`, emailErr.response?.data || emailErr.message);
                 }
             }
         } catch (error) {

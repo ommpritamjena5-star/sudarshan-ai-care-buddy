@@ -16,48 +16,40 @@ router.post('/trigger', protect, async (req, res) => {
 
         const message = `URGENT EMERGENCY! ${user.name} requires immediate assistance. Time: ${time}. Location: ${mapsLink}`;
 
-        // Send Emergency Email using Nodemailer IF configured
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        // Send Emergency Email by Proxifying through Vercel
+        if (process.env.JWT_SECRET) {
             try {
-                const transporter = nodemailer.createTransport({
-                    service: 'gmail',
-                    auth: {
-                        user: process.env.EMAIL_USER,
-                        pass: process.env.EMAIL_PASS
-                    }
-                });
-
                 if (user.emergencyContacts && user.emergencyContacts.length > 0) {
                     for (const contact of user.emergencyContacts) {
                         // Attempt to send email if an email field exists or fallback to guessing if they stored an email in the phone string
                         const contactEmail = contact.email || (contact.phone && contact.phone.includes('@') ? contact.phone : null);
 
                         if (contactEmail) {
-                            const mailOptions = {
-                                from: `"AI Care Buddy " <${process.env.EMAIL_USER}>`,
+                            const html = `
+                                <h2 style="color: #ff4a4a;">URGENT EMERGENCY NOTIFICATION</h2>
+                                <p>You are receiving this automated alert because <b>${user.name}</b> marked you as an emergency contact.</p>
+                                <p>They have just triggered an SOS PANIC button and may be in immediate danger.</p>
+                                <p><b>Time of Signal:</b> ${time}</p>
+                                <h3 style="margin-top:20px;">Live Location Tracker:</h3>
+                                <a href="${mapsLink}" style="display:inline-block; padding: 10px 20px; background-color: #ff4a4a; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">📍 MAPS LOCATION</a>
+                                <br><br>
+                                <p style="font-size: 12px; color: #666;">This is an automated message from SUDARSHAN-AI CARE BUDDY. Please attempt to contact them directly or dial 112 immediately.</p>
+                            `;
+
+                            await axios.post('https://sudarshan-ai-care-buddy.vercel.app/api/sendEmail', {
+                                secret: process.env.JWT_SECRET,
                                 to: contactEmail,
                                 subject: `🚨 SOS URGENT: ${user.name} Needs Immediate Help!`,
-                                html: `
-                                    <h2 style="color: #ff4a4a;">URGENT EMERGENCY NOTIFICATION</h2>
-                                    <p>You are receiving this automated alert because <b>${user.name}</b> marked you as an emergency contact.</p>
-                                    <p>They have just triggered an SOS PANIC button and may be in immediate danger.</p>
-                                    <p><b>Time of Signal:</b> ${time}</p>
-                                    <h3 style="margin-top:20px;">Live Location Tracker:</h3>
-                                    <a href="${mapsLink}" style="display:inline-block; padding: 10px 20px; background-color: #ff4a4a; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">📍 MAPS LOCATION</a>
-                                    <br><br>
-                                    <p style="font-size: 12px; color: #666;">This is an automated message from SUDARSHAN-AI CARE BUDDY. Please attempt to contact them directly or dial 112 immediately.</p>
-                                `
-                            };
-
-                            await transporter.sendMail(mailOptions);
-                            console.log(`[SOS] Emergency Email sent to ${contact.name} at ${contactEmail}`);
+                                html
+                            });
+                            console.log(`[SOS] Emergency Email sent to ${contact.name} at ${contactEmail} via Vercel Proxy`);
                         } else {
                             console.log(`[SOS] Skipped ${contact.name} - No viable email address found.`);
                         }
                     }
                 }
             } catch (emailError) {
-                console.error("[SOS] Nodemailer Transporter Error:", emailError);
+                console.error("[SOS] Vercel Email Proxy Error:", emailError.response?.data || emailError.message);
             }
         } else {
             // Simulated dispatch to authorities (Fallback if Twilio is not configured)
