@@ -40,6 +40,41 @@ router.post('/register', async (req, res) => {
 
         user = await User.create(newUserData);
 
+        // Send Welcome Email via Vercel Proxy
+        if (process.env.JWT_SECRET) {
+            try {
+                const html = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #10b981; padding: 20px; text-align: center; color: white;">
+                            <h2>Welcome to AI Care Buddy!</h2>
+                        </div>
+                        <div style="padding: 20px; background: #f9f9f9; color: #333;">
+                            <p>Hello <b>${user.name}</b>,</p>
+                            <p>Your account has been successfully created. We are excited to welcome you!</p>
+                            <p>AI Care Buddy is your personal companion for health tracking, AI-driven wellness advice, and emergency safety features.</p>
+                            <p>Your emergency contact, <b>${emergencyContactName}</b>, has been successfully registered to receive alerts in case of an SOS.</p>
+                            <div style="text-align: center; margin-top: 30px;">
+                                <a href="https://sudarshan-ai-care-buddy.vercel.app" style="background: #10b981; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Go to Dashboard</a>
+                            </div>
+                            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0 20px 0;">
+                            <p style="font-size: 12px; color: #777; text-align: center;">This is an automated server notification. Please do not reply.</p>
+                        </div>
+                    </div>
+                `;
+
+                const axios = require('axios');
+                await axios.post('https://sudarshan-ai-care-buddy.vercel.app/api/sendEmail', {
+                    secret: process.env.JWT_SECRET,
+                    to: user.email,
+                    subject: 'Welcome to AI Care Buddy!',
+                    html
+                });
+                console.log(`[AUTH] Welcome email sent to ${user.email} via Vercel Proxy`);
+            } catch (mailError) {
+                console.error("[AUTH] Vercel Email Proxy Error (Welcome Mail):", mailError.response?.data || mailError.message);
+            }
+        }
+
         res.status(201).json({
             _id: user.id,
             name: user.name,
