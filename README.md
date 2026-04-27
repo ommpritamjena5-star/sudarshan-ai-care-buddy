@@ -18,7 +18,7 @@ In critical situations (Earthquakes, Floods, Medical Emergencies), every second 
 * **Visual Diagnosis:** Upload X-Rays or physical injuries—the Gemini Vision AI analyzes the image context to give preliminary insights until a doctor arrives.
 * **Geospatial Awareness:** Instantly locates the absolute closest Hospitals, Pharmacies, and Police Stations based on your current physical GPS drop.
 
----
+--- 
 
 ## 🛠️ Technology Stack Architecture
 
