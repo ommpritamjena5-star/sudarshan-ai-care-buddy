@@ -89,46 +89,39 @@ router.post('/forgot-password', async (req, res) => {
 
         if (!user) return res.status(404).json({ message: 'No account found matching this email and phone number combination.' });
 
-        // Real Email Dispatch using Nodemailer
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        // Real Email Dispatch via Vercel Proxy
+        if (process.env.JWT_SECRET) {
             try {
-                const transporter = nodemailer.createTransport({
-                    service: 'gmail',
-                    auth: {
-                        user: process.env.EMAIL_USER,
-                        pass: process.env.EMAIL_PASS
-                    }
-                });
+                const html = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #1f6feb; padding: 20px; text-align: center; color: white;">
+                            <h2>AI Care Buddy Security</h2>
+                        </div>
+                        <div style="padding: 20px; background: #f9f9f9; color: #333;">
+                            <p>Hello <b>${user.name}</b>,</p>
+                            <p>We have successfully verified your identity for phone number ending in ${mobile.slice(-4)}.</p>
+                            <p>Please return to the application to enter your new password securely. If you did not request this reset, please contact support immediately.</p>
+                            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                            <p style="font-size: 12px; color: #777; text-align: center;">This is an automated security email. Do not reply.</p>
+                        </div>
+                    </div>
+                `;
 
-                const mailOptions = {
-                    from: `"AI Care Buddy" <${process.env.EMAIL_USER}>`,
+                const axios = require('axios');
+                await axios.post('https://sudarshan-ai-care-buddy.vercel.app/api/sendEmail', {
+                    secret: process.env.JWT_SECRET,
                     to: user.email,
                     subject: 'AI Care Buddy - Password Reset Verification',
-                    html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-                            <div style="background: #1f6feb; padding: 20px; text-align: center; color: white;">
-                                <h2>AI Care Buddy Security</h2>
-                            </div>
-                            <div style="padding: 20px; background: #f9f9f9; color: #333;">
-                                <p>Hello <b>${user.name}</b>,</p>
-                                <p>We have successfully verified your identity for phone number ending in ${mobile.slice(-4)}.</p>
-                                <p>Please return to the application to enter your new password securely. If you did not request this reset, please contact support immediately.</p>
-                                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                                <p style="font-size: 12px; color: #777; text-align: center;">This is an automated security email. Do not reply.</p>
-                            </div>
-                        </div>
-                    `
-                };
-
-                await transporter.sendMail(mailOptions);
-                console.log(`[AUTH] Authentic Password Reset email sent to ${user.email}`);
+                    html
+                });
+                console.log(`[AUTH] Authentic Password Reset email sent to ${user.email} via Vercel Proxy`);
             } catch (mailError) {
-                console.error("[AUTH] Nodemailer Error:", mailError);
+                console.error("[AUTH] Vercel Email Proxy Error:", mailError.response?.data || mailError.message);
                 // Return anyway so the frontend can still proceed to step 2 visually,
                 // but log the explicit failure if the keys are wrong.
             }
         } else {
-            console.log(`[AUTH] Mock Email Sent: Missing EMAIL_USER in .env. Proceeding to Step 2.`);
+            console.log(`[AUTH] Mock Email Sent: Missing JWT_SECRET in .env. Proceeding to Step 2.`);
         }
 
         res.json({ message: 'Verified. Proceed to reset password.' });
